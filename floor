@@ -1,0 +1,41 @@
+#!/<YOUR_INTERPRETER_HERE>
+
+__author__ = "www.hmprt.com"
+
+import requests
+from concurrent.futures import ThreadPoolExecutor
+
+import cloudscraper
+import click
+from bs4 import BeautifulSoup
+
+
+@click.command()
+@click.argument("slug")
+def check_floor_price(slug: str, NUM_CONCURRENT_REQUESTS: int = 100):
+    """
+    Given an opensea slug, prints the collection's floor price
+    to terminal
+    """
+    successes = []
+    URL = f"https://opensea.io/collection/{slug}"
+
+    while not successes:
+        with ThreadPoolExecutor(NUM_CONCURRENT_REQUESTS) as pool:
+            successes = [
+                future.result()
+                for future in [
+                    pool.submit(lambda url: cloudscraper.create_scraper().get(url), URL)
+                ]
+                if future.result().status_code == 200
+            ]
+    doc = BeautifulSoup(successes[0].content, features="html.parser")
+    price = doc.find(
+        "div",
+        "Blockreact__Block-sc-1xf18x6-0 Flexreact__Flex-sc-1twd32i-0 InfoItemreact__Container-sc-gubhmc-1 dBFmez jYqxGr dLEHkN CollectionStatsBar--info",
+    ).text.split("floor")[0]
+    print(f"{slug}: {price}E")
+
+
+if __name__ == "__main__":
+    check_floor_price()
